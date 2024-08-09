@@ -14,14 +14,17 @@ const DESIRED_FPS = 60
 
 var GAME_TICK_RATE = (uint64)(math.Floor(float64(1000) / float64(DESIRED_FPS)))
 
-const SANKE_INITIAL_LENGTH = 5
+const SNAKE_INITIAL_LENGTH = 5
 const SNAKE_MAX_LENGTH = 256
-const SNAKE_PART_SIZE = 32
+const SNAKE_EYE_SIZE = 4
+const SNAKE_EYE_OFFSET = 6
 
-const GRID_WIDTH = WINDOW_WIDTH / SNAKE_PART_SIZE
-const GRID_HEIGHT = WINDOW_HEIGHT / SNAKE_PART_SIZE
+const GRID_CELL_SIZE = 32
+const GRID_WIDTH = WINDOW_WIDTH / GRID_CELL_SIZE
+const GRID_HEIGHT = WINDOW_HEIGHT / GRID_CELL_SIZE
+
 const UPDATE_FRAME_RATE = 10
-const SNAKE_OFFSET_DELTA = float32(SNAKE_PART_SIZE) / float32(UPDATE_FRAME_RATE)
+const SNAKE_OFFSET_DELTA = float32(GRID_CELL_SIZE) / float32(UPDATE_FRAME_RATE)
 
 const FOOD_MAX_LENGTH = 5
 
@@ -32,6 +35,7 @@ type SnakeData struct {
 }
 
 type FoodData struct {
+	Position Point
 }
 
 type GameState struct {
@@ -39,8 +43,37 @@ type GameState struct {
 	Snake             []SnakeData
 	SnakeLength       uint8
 	SnakeNextVelocity Point
+	GrowSnake         bool
 	Food              []FoodData
 	FoodLength        uint8
+}
+
+func isSnakeAtPosition(gameState *GameState, position Point) bool {
+	for i := 0; i < int(gameState.SnakeLength); i += 1 {
+		if gameState.Snake[i].Position.Equals(position) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func getFoodByPosition(gameState *GameState, position Point) *FoodData {
+	for i := 0; i < int(gameState.FoodLength); i += 1 {
+		if gameState.Food[i].Position.Equals(position) {
+			return &gameState.Food[i]
+		}
+	}
+
+	return nil
+}
+
+func getRandomPointNotContainingSnake(gameState *GameState) Point {
+	point := RandomPoint(GRID_WIDTH, GRID_HEIGHT)
+	for isSnakeAtPosition(gameState, point) {
+		point = RandomPoint(GRID_WIDTH, GRID_HEIGHT)
+	}
+	return point
 }
 
 func main() {
@@ -132,7 +165,8 @@ func initialize() GameState {
 	gameState := GameState{
 		FrameCount:  0,
 		Snake:       make([]SnakeData, SNAKE_MAX_LENGTH),
-		SnakeLength: SANKE_INITIAL_LENGTH,
+		SnakeLength: SNAKE_INITIAL_LENGTH,
+		Food:        make([]FoodData, FOOD_MAX_LENGTH),
 	}
 
 	for i := int32(0); i < int32(gameState.SnakeLength); i += 1 {
@@ -142,6 +176,11 @@ func initialize() GameState {
 
 	gameState.SnakeNextVelocity.X = 1
 
+	foodPosition := getRandomPointNotContainingSnake(&gameState)
+
+	gameState.Food[0].Position = foodPosition
+	gameState.FoodLength = 1
+
 	return gameState
 }
 
@@ -149,43 +188,112 @@ func update(elapsedTime float32, gameState *GameState) {
 	gameState.FrameCount += 1
 
 	if gameState.FrameCount%UPDATE_FRAME_RATE == 0 {
-		for i := int(gameState.SnakeLength - 1); i >= 0; i -= 1 {
-			if i == 0 {
-				gameState.Snake[0].Position = Point{
-					X: gameState.Snake[0].Position.X + gameState.Snake[0].Velocity.X,
-					Y: gameState.Snake[0].Position.Y + gameState.Snake[0].Velocity.Y,
-				}
-			} else {
-				gameState.Snake[i].Position = gameState.Snake[i-1].Position
-				gameState.Snake[i].Velocity = gameState.Snake[i-1].Velocity
-			}
-			gameState.Snake[i].Offset = Vec2{0, 0}
-		}
-
-		gameState.Snake[0].Velocity = gameState.SnakeNextVelocity
+		updateSnakePosition(gameState)
+		checkForCollisions(gameState)
 	} else {
-		for i := 0; i < int(gameState.SnakeLength); i += 1 {
-			gameState.Snake[i].Offset.X += SNAKE_OFFSET_DELTA * float32(gameState.Snake[i].Velocity.X)
-			gameState.Snake[i].Offset.Y += SNAKE_OFFSET_DELTA * float32(gameState.Snake[i].Velocity.Y)
+		updateSnakeOffset(gameState)
+	}
+}
+
+func updateSnakePosition(gameState *GameState) {
+	if gameState.GrowSnake {
+		gameState.SnakeLength += 1
+		gameState.GrowSnake = false
+	}
+
+	for i := int(gameState.SnakeLength - 1); i >= 0; i -= 1 {
+		if i == 0 {
+			gameState.Snake[0].Position = Point{
+				X: gameState.Snake[0].Position.X + gameState.Snake[0].Velocity.X,
+				Y: gameState.Snake[0].Position.Y + gameState.Snake[0].Velocity.Y,
+			}
+		} else {
+			gameState.Snake[i].Position = gameState.Snake[i-1].Position
+			gameState.Snake[i].Velocity = gameState.Snake[i-1].Velocity
 		}
+		gameState.Snake[i].Offset = Vec2{0, 0}
+	}
+
+	gameState.Snake[0].Velocity = gameState.SnakeNextVelocity
+}
+
+func checkForCollisions(gameState *GameState) {
+	food := getFoodByPosition(gameState, gameState.Snake[0].Position)
+
+	if food != nil {
+		food.Position = getRandomPointNotContainingSnake(gameState)
+		gameState.GrowSnake = true
+	}
+}
+
+func updateSnakeOffset(gameState *GameState) {
+	for i := 0; i < int(gameState.SnakeLength); i += 1 {
+		gameState.Snake[i].Offset.X += SNAKE_OFFSET_DELTA * float32(gameState.Snake[i].Velocity.X)
+		gameState.Snake[i].Offset.Y += SNAKE_OFFSET_DELTA * float32(gameState.Snake[i].Velocity.Y)
 	}
 }
 
 func draw(renderer *SDL.Renderer, gameState *GameState) {
+	rect := SDL.Rect{}
+
 	SDL.SetRenderDrawColor(renderer, 100, 149, 237, 255)
 	SDL.RenderClear(renderer)
 
-	for i := (int)(gameState.SnakeLength - 1); i >= 0; i -= 1 {
-		color := (uint8)(float32(i+1) / float32(gameState.SnakeLength) * float32(255))
-		SDL.SetRenderDrawColor(renderer, color, color, color, 255)
+	// Food
+	for i := 0; i < int(gameState.FoodLength); i += 1 {
 		rect := SDL.Rect{
-			X: gameState.Snake[i].Position.X*SNAKE_PART_SIZE + int32(gameState.Snake[i].Offset.X),
-			Y: gameState.Snake[i].Position.Y*SNAKE_PART_SIZE + int32(gameState.Snake[i].Offset.Y),
-			W: SNAKE_PART_SIZE,
-			H: SNAKE_PART_SIZE,
+			X: gameState.Food[i].Position.X * GRID_CELL_SIZE,
+			Y: gameState.Food[i].Position.Y * GRID_CELL_SIZE,
+			W: GRID_CELL_SIZE,
+			H: GRID_CELL_SIZE,
 		}
+
+		SDL.SetRenderDrawColor(renderer, 255, 0, 0, 255)
 		SDL.FillRect(renderer, &rect)
 	}
+
+	// Snake
+	for i := (int)(gameState.SnakeLength - 1); i >= 0; i -= 1 {
+		rect = SDL.Rect{
+			X: gameState.Snake[i].Position.X*GRID_CELL_SIZE + int32(gameState.Snake[i].Offset.X),
+			Y: gameState.Snake[i].Position.Y*GRID_CELL_SIZE + int32(gameState.Snake[i].Offset.Y),
+			W: GRID_CELL_SIZE,
+			H: GRID_CELL_SIZE,
+		}
+
+		color := (uint8)(float32(i+1) / float32(gameState.SnakeLength) * float32(255))
+		SDL.SetRenderDrawColor(renderer, color, color, color, 255)
+		SDL.FillRect(renderer, &rect)
+	}
+
+	// Snake Eyes
+	rect = SDL.Rect{
+		X: gameState.Snake[0].Position.X*GRID_CELL_SIZE + int32(gameState.Snake[0].Offset.X) + SNAKE_EYE_OFFSET,
+		Y: gameState.Snake[0].Position.Y*GRID_CELL_SIZE + int32(gameState.Snake[0].Offset.Y) + SNAKE_EYE_OFFSET,
+		W: SNAKE_EYE_SIZE,
+		H: SNAKE_EYE_SIZE,
+	}
+
+	if gameState.Snake[0].Velocity.X == RIGHT {
+		rect.X += GRID_CELL_SIZE - SNAKE_EYE_SIZE - (SNAKE_EYE_OFFSET * 2)
+	}
+
+	if gameState.Snake[0].Velocity.Y == DOWN {
+		rect.Y += GRID_CELL_SIZE - SNAKE_EYE_SIZE - (SNAKE_EYE_OFFSET * 2)
+	}
+
+	SDL.SetRenderDrawColor(renderer, 255, 255, 0, 255)
+	SDL.FillRect(renderer, &rect)
+
+	if gameState.Snake[0].Velocity.X != 0 {
+		rect.Y += GRID_CELL_SIZE - SNAKE_EYE_SIZE - (SNAKE_EYE_OFFSET * 2)
+	}
+
+	if gameState.Snake[0].Velocity.Y != 0 {
+		rect.X += GRID_CELL_SIZE - SNAKE_EYE_SIZE - (SNAKE_EYE_OFFSET * 2)
+	}
+
+	SDL.FillRect(renderer, &rect)
 
 	SDL.RenderPresent(renderer)
 }

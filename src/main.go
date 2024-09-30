@@ -81,20 +81,20 @@ func main() {
 }
 
 func run() int {
-	if SDL.Init(SDL.INIT_VIDEO) != 0 {
-		SDL.LogError(SDL.LOG_CATEGORY_APPLICATION, "Failed initialize SDL.")
+	err := SDL.Init(SDL.INIT_VIDEO)
+
+	if err != nil {
+		SDL.LogError(SDL.LOG_CATEGORY_APPLICATION, "Failed initialize SDL: %s", err)
 		return 1
 	}
 	defer SDL.Quit()
 
 	SDL.LogSetPriority(SDL.LOG_CATEGORY_APPLICATION, SDL.LOG_PRIORITY_DEBUG)
 
-	var window *SDL.Window
-	var renderer *SDL.Renderer
-	result := SDL.CreateWindowAndRenderer(WINDOW_WIDTH, WINDOW_HEIGHT, SDL.WINDOW_SHOWN, &window, &renderer)
+	window, renderer, err := SDL.CreateWindowAndRenderer(WINDOW_WIDTH, WINDOW_HEIGHT, SDL.WINDOW_SHOWN)
 
-	if result != 0 {
-		SDL.LogError(SDL.LOG_CATEGORY_APPLICATION, "Failed to create window and renderer.")
+	if err != nil {
+		SDL.LogError(SDL.LOG_CATEGORY_APPLICATION, "Failed to create window and renderer: %s", err)
 		return 1
 	}
 
@@ -106,20 +106,19 @@ func run() int {
 	gameState := initialize()
 
 	shouldQuit := false
-	event := SDL.Event{}
 
 	currentTime := SDL.GetTicks64()
 	lastTime := currentTime
 
 	for !shouldQuit {
-		for SDL.PollEvent(&event) > 0 {
+		for event := SDL.PollEvent(); event != nil; event = SDL.PollEvent() {
 			switch event.Type() {
 
 			case SDL.QUIT:
 				shouldQuit = true
 
 			case SDL.KEYDOWN:
-				switch event.Key.Keysym().Scancode {
+				switch event.Key().Keysym().Scancode {
 				case SDL.SCANCODE_UP:
 					if gameState.Snake[0].Velocity.Y != 1 {
 						gameState.SnakeNextVelocity = Point{X: 0, Y: -1}
@@ -239,6 +238,14 @@ func draw(renderer *SDL.Renderer, gameState *GameState) {
 	SDL.SetRenderDrawColor(renderer, 100, 149, 237, 255)
 	SDL.RenderClear(renderer)
 
+	SDL.SetRenderDrawColor(renderer, 80, 80, 80, 255)
+	for x := 0; x < WINDOW_WIDTH; x += GRID_CELL_SIZE {
+		SDL.RenderDrawLine(renderer, x, 0, x, WINDOW_HEIGHT)
+	}
+	for y := 0; y < WINDOW_HEIGHT; y += GRID_CELL_SIZE {
+		SDL.RenderDrawLine(renderer, 0, y, WINDOW_WIDTH, y)
+	}
+
 	// Food
 	for i := 0; i < int(gameState.FoodLength); i += 1 {
 		rect := SDL.Rect{
@@ -249,7 +256,7 @@ func draw(renderer *SDL.Renderer, gameState *GameState) {
 		}
 
 		SDL.SetRenderDrawColor(renderer, 255, 0, 0, 255)
-		SDL.FillRect(renderer, &rect)
+		SDL.RenderFillRect(renderer, &rect)
 	}
 
 	// Snake
@@ -263,7 +270,7 @@ func draw(renderer *SDL.Renderer, gameState *GameState) {
 
 		color := (uint8)(float32(i+1) / float32(gameState.SnakeLength) * float32(255))
 		SDL.SetRenderDrawColor(renderer, color, color, color, 255)
-		SDL.FillRect(renderer, &rect)
+		SDL.RenderFillRect(renderer, &rect)
 	}
 
 	// Snake Eyes
@@ -283,7 +290,7 @@ func draw(renderer *SDL.Renderer, gameState *GameState) {
 	}
 
 	SDL.SetRenderDrawColor(renderer, 255, 255, 0, 255)
-	SDL.FillRect(renderer, &rect)
+	SDL.RenderFillRect(renderer, &rect)
 
 	if gameState.Snake[0].Velocity.X != 0 {
 		rect.Y += GRID_CELL_SIZE - SNAKE_EYE_SIZE - (SNAKE_EYE_OFFSET * 2)
@@ -293,7 +300,7 @@ func draw(renderer *SDL.Renderer, gameState *GameState) {
 		rect.X += GRID_CELL_SIZE - SNAKE_EYE_SIZE - (SNAKE_EYE_OFFSET * 2)
 	}
 
-	SDL.FillRect(renderer, &rect)
+	SDL.RenderFillRect(renderer, &rect)
 
 	SDL.RenderPresent(renderer)
 }

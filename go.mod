@@ -6,4 +6,4 @@ require (
 	github.com/smack0007/sdl-go v0.0.0
 )
 
-replace github.com/smack0007/sdl-go => ../sdl-go
+replace github.com/smack0007/sdl-go => ./internal/sdl-go

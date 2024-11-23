@@ -3,8 +3,9 @@ package main
 import (
 	"math"
 	"os"
+	"runtime"
 
-	SDL "github.com/smack0007/sdl-go/sdl"
+	SDL "github.com/smack0007/snake/engine/sdl"
 )
 
 const WINDOW_WIDTH = 1024
@@ -77,6 +78,7 @@ func getRandomPointNotContainingSnake(gameState *GameState) Point {
 }
 
 func main() {
+	runtime.LockOSThread()
 	os.Exit(run())
 }
 

@@ -1,3 +1,0 @@
-[submodule "internal/sdl-go"]
-	path = internal/sdl-go
-	url = git@github.com:smack0007/sdl-go.git

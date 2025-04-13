@@ -5,11 +5,6 @@ import (
 )
 
 const (
-	KEY_UP = iota
-	KEY_RIGHT
-	KEY_DOWN
-	KEY_LEFT
-
 	UP    = -1
 	RIGHT = 1
 	DOWN  = 1
@@ -20,8 +15,8 @@ type Point struct {
 	X, Y int32
 }
 
-func (this Point) Equals(other Point) bool {
-	return this.X == other.X && this.Y == other.Y
+func (p1 Point) Equals(p2 Point) bool {
+	return p1.X == p2.X && p1.Y == p2.Y
 }
 
 func RandomPoint(maxX int32, maxY int32) Point {
@@ -35,6 +30,6 @@ type Vec2 struct {
 	X, Y float32
 }
 
-func (this Vec2) Equals(other Vec2) bool {
-	return this.X == other.X && this.Y == other.Y
+func (v1 Vec2) Equals(v2 Vec2) bool {
+	return v1.X == v2.X && v1.Y == v2.Y
 }

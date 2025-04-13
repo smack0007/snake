@@ -17,7 +17,7 @@
       },
       "type": "process",
       "command": "go",
-      "args": ["build", "-o", "./bin/snake", "./src"],
+      "args": ["build", "-tags", "sdl", "-o", "./bin/snake", "./snake"],
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -39,7 +39,7 @@
       },
       "type": "process",
       "command": "go",
-      "args": ["run", "./src"],
+      "args": ["run", "-tags", "sdl", "./snake"],
       "options": {
         "env": {
           "GDK_BACKEND": "wayland"
